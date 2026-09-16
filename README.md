@@ -1,8 +1,10 @@
 # BMW NBT EVO HDD password derivation
 
+[English](README.md) | [Deutsch](README_DE.md)
+
 Research notes and a small offline tool for deriving the ATA user password used by BMW/Harman NBT EVO hard drives.
 
-This repository intentionally contains **no real vehicle/head-unit identifiers, no real MAC addresses, no real serial numbers, and no real recovered password**. All examples are synthetic.
+This repository intentionally contains **no real vehicle/head-unit identifiers, no real MAC addresses, no real serial numbers, no real sticker contents, and no real recovered password**. All examples are synthetic.
 
 ## What was recovered
 
@@ -19,17 +21,26 @@ password = Base64(digest[0:15])
 
 Standard Base64 of exactly 15 bytes produces a 20-character ASCII password with no `=` padding.
 
-## Which serial value is used?
+## Which sticker value is used?
 
-Do **not** use the 7-digit `SNR:` from the sticker directly.
+Do **not** use the 7-digit `SNR:` field directly.
 
-The security routine uses `E2P.ProdLogistic.SerialNo` as raw bytes. In the verified 2018 NBT EVO unit used during research, the working 10-byte serial value had this form:
+The security routine uses `E2P.ProdLogistic.SerialNo` as raw bytes. On the 2018 NBT EVO unit used for hardware validation, the working 10-byte serial value could be reconstructed from the **main barcode line on the HU label** as:
 
 ```text
-00 || ASCII(last 9 characters of the main barcode)
+serial_raw = 0x00 || ASCII(last 9 characters of the main barcode)
 ```
 
-So if a *synthetic* sticker barcode were:
+The important field selection is therefore:
+
+```text
+HU label
+  main barcode  ---> take the LAST 9 characters
+  SNR:          ---> do NOT use directly
+  CRIN:         ---> not used by the verified reconstruction
+```
+
+If a *synthetic* sticker barcode were:
 
 ```text
 ABCDE1A2B3C4D5
@@ -39,25 +50,35 @@ then:
 
 ```text
 last 9 barcode characters = 1A2B3C4D5
-serial raw                = 00 31 41 32 42 33 43 34 44 35
-serial hex                = 00314132423343344435
+ASCII bytes                = 31 41 32 42 33 43 34 44 35
+prefix                     = 00
+serial raw                 = 00 31 41 32 42 33 43 34 44 35
+serial hex                 = 00314132423343344435
 ```
 
-The important distinction is:
+So the steps are:
 
-- **Use the main barcode line**, not the 7-digit `SNR:`.
-- The observed mapping used the **last 9 barcode characters**.
-- Prefix those 9 ASCII characters with one zero byte (`0x00`).
-- If the exact `E2P.ProdLogistic.SerialNo` can be read diagnostically, prefer that exact value over sticker inference.
+1. Read the Ethernet MAC from the HU label.
+2. Read the Bluetooth MAC from the HU label.
+3. Read the **main barcode** from the HU label.
+4. Take the **last 9 characters** of that main barcode.
+5. Encode those 9 characters as ASCII bytes.
+6. Prefix one zero byte (`0x00`).
+7. Concatenate `ETH raw || BT raw || serial raw`.
+8. Calculate MD5.
+9. Take only the first 15 MD5 bytes.
+10. Encode those 15 bytes using standard Base64.
 
-The barcode-to-serial mapping above is empirically verified on one 2018 NBT EVO and should not yet be assumed universal for every EVO hardware revision or market.
+If the exact diagnostic value of `E2P.ProdLogistic.SerialNo` is available, prefer that exact value over sticker inference.
 
-## Example with synthetic values
+> **Scope note:** the barcode-to-serial mapping `0x00 + ASCII(last 9 main-barcode characters)` was empirically verified on one 2018 NBT EVO. It should not yet be assumed universal for every EVO hardware revision, production period, or market.
+
+## Synthetic example
 
 ```text
-Ethernet MAC = 00:11:22:33:44:55
+Ethernet MAC  = 00:11:22:33:44:55
 Bluetooth MAC = AA:BB:CC:DD:EE:FF
-Main barcode = ABCDE1A2B3C4D5
+Main barcode  = ABCDE1A2B3C4D5
 ```
 
 Derived serial:
@@ -67,7 +88,7 @@ last 9 characters = 1A2B3C4D5
 serial hex         = 00314132423343344435
 ```
 
-Then run:
+Run:
 
 ```bash
 python3 tools/derive_evo_hdd_password.py \
@@ -77,7 +98,7 @@ python3 tools/derive_evo_hdd_password.py \
   --verbose
 ```
 
-For the synthetic example the output password is:
+For this synthetic example the output password is:
 
 ```text
 hAR5JcWED+Zf31RoQgHF
@@ -94,6 +115,20 @@ python3 tools/derive_evo_hdd_password.py \
   --serial-hex 00314132423343344435 \
   --verbose
 ```
+
+## Built-in self-test
+
+```bash
+python3 tools/derive_evo_hdd_password.py --self-test
+```
+
+Expected:
+
+```text
+SELF_TEST_PASS
+```
+
+The test vector is synthetic and contains no identifiers from the hardware used during validation.
 
 ## Checking ATA security state
 
@@ -155,6 +190,8 @@ sudo blockdev --getro /dev/sdX
 ```
 
 See [`docs/RESEARCH.md`](docs/RESEARCH.md) for the reverse-engineering evidence and [`docs/IMAGING.md`](docs/IMAGING.md) for a preservation-oriented imaging workflow.
+
+German versions: [`README_DE.md`](README_DE.md), [`docs/RESEARCH_DE.md`](docs/RESEARCH_DE.md), [`docs/IMAGING_DE.md`](docs/IMAGING_DE.md).
 
 ## Scope
 
