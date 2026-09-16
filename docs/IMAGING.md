@@ -1,6 +1,8 @@
 # Preservation-oriented imaging workflow
 
-After a successful ATA unlock, avoid modifying the original drive.
+[English](IMAGING.md) | [Deutsch](IMAGING_DE.md)
+
+After a successful ATA unlock, avoid modifying the original drive. The first goal should be a complete 1:1 image.
 
 ## Make the Linux block device read-only
 
@@ -9,9 +11,15 @@ sudo blockdev --setro /dev/sdX
 sudo blockdev --getro /dev/sdX
 ```
 
-The second command should print `1`.
+The second command should print:
 
-## Image with ddrescue
+```text
+1
+```
+
+This makes the Linux block device read-only without changing the drive's ATA security configuration.
+
+## Image with GNU ddrescue
 
 Install GNU ddrescue:
 
@@ -20,16 +28,18 @@ sudo apt update
 sudo apt install -y gddrescue
 ```
 
-First pass:
+First, preservation-oriented pass:
 
 ```bash
-sudo ddrescue -f -n \
+sudo ddrescue -n \
   /dev/sdX \
   /path/to/nbt-evo-hdd.img \
   /path/to/nbt-evo-hdd.map
 ```
 
-Retry pass:
+`-n` first tries to recover as much data as possible without spending time on repeated retries. The map file records progress and lets later passes target only unresolved areas.
+
+If read errors remain after the first pass, use the same map file for a retry pass:
 
 ```bash
 sudo ddrescue -d -r3 \
@@ -45,4 +55,8 @@ sha256sum /path/to/nbt-evo-hdd.img \
   | tee /path/to/nbt-evo-hdd.img.sha256
 ```
 
-Perform subsequent filesystem analysis on the image or on a clone, not on the original disk.
+## Continue work only on an image or clone
+
+Perform subsequent filesystem analysis, extraction, modifications, or replacement-drive experiments on the image or on a clone, not on the original disk.
+
+Before writing an image to an SSD or other target disk, identify the destination unambiguously with `lsblk`. Writing an image directly to `/dev/sdX` overwrites the target's partition table and filesystems completely.
