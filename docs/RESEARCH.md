@@ -1,5 +1,7 @@
 # Reverse-engineering notes
 
+[English](RESEARCH.md) | [Deutsch](RESEARCH_DE.md)
+
 ## Analyzed component
 
 The derivation was recovered from BMW/Harman `srv-hddmgr2` build 4, an ARM/QNX executable responsible for HDD management and HDD security.
@@ -72,7 +74,7 @@ On the single 2018 NBT EVO used for hardware validation, the exact security seri
 serial_raw = 0x00 || ASCII(last 9 characters of main barcode)
 ```
 
-The 7-digit `SNR:` field was not the value used directly by the HDD password routine.
+The 7-digit `SNR:` field was not the value used directly by the HDD password routine. The `CRIN:` line was also not used by the verified reconstruction; the relevant source was the main barcode line and its last 9 characters.
 
 This public repository intentionally omits the real sticker contents, real MAC addresses, and real derived password used during that validation.
 
@@ -96,3 +98,5 @@ Still limited in scope:
 The label mapping 0x00 + ASCII(last 9 main-barcode chars)
 was verified on one 2018 unit and is not claimed universal.
 ```
+
+When possible, prefer the exact diagnostic `E2P.ProdLogistic.SerialNo` value over label inference.
